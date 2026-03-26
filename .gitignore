@@ -2,3 +2,4 @@
 airforce*.log
 .refact/
 /airforce-rate-limits.log
+.env
