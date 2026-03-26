@@ -3,3 +3,4 @@ airforce*.log
 .refact/
 /airforce-rate-limits.log
 .env
+node_modules/
