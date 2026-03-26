@@ -46,7 +46,7 @@ class TestRunner {
         name,
         passed: false,
         duration,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error) || 'Unknown error',
       });
       console.log(`✗ ${name} (${duration}ms) - ${error}`);
     }

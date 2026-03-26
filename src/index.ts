@@ -119,11 +119,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'kivest_search': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
         const searchRequest: SearchRequest = {
-          query: args.query as string,
-          model: (args.model as string) || 'gpt-5.1',
-          maxTokens: (args.maxTokens as number) || 1024,
-          temperature: (args.temperature as number) || 0.7,
+          query: args.query,
+          model: typeof args.model === 'string' ? args.model : 'gpt-5.1',
+          maxTokens: typeof args.maxTokens === 'number' ? args.maxTokens : 1024,
+          temperature: typeof args.temperature === 'number' ? args.temperature : 0.7,
           stream: false,
         };
 

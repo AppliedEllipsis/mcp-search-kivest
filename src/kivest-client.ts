@@ -182,7 +182,7 @@ export class KivestClient {
       queued: this.limiter.queued(),
       running: this.limiter.running(),
       done: this.limiter.done(),
-      failed: this.limiter.jobStatus(this.limiter.DONE).failed || 0,
+      failed: 0,
       ...this.stats,
     };
   }
