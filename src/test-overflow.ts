@@ -85,7 +85,7 @@ async function testQueueOverflow() {
     console.log('Bottleneck retry mechanism should have requeued these.');
   }
   
-  const errors = results.filter(r => !r.success && r.error);
+  const errors = results.filter(r => !r.success && (r as any).error);
   if (errors.length > 0) {
     console.log('\n' + '='.repeat(60));
     console.log('ERROR SAMPLES:');
