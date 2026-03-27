@@ -8,7 +8,7 @@ Ready-to-use configuration files with your actual filesystem path.
 
 ## OpenCode
 
-### Option 1: Project Config (Recommended)
+### Project Config (Recommended)
 
 Create file: `D:\_projects\mcp-search-kivest\opencode.json`
 
@@ -18,24 +18,7 @@ Create file: `D:\_projects\mcp-search-kivest\opencode.json`
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
-      "enabled": true
-    }
-  }
-}
-```
-
-### Option 2: Global Config
-
-Create file: `%USERPROFILE%\.config\opencode\opencode.json`
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "kivest-search": {
-      "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
+      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
       "enabled": true
     }
   }
@@ -44,53 +27,20 @@ Create file: `%USERPROFILE%\.config\opencode\opencode.json`
 
 ---
 
-## Kilocode
+## Kilocode VS Code Extension
 
-### Option 1: Project Config (Recommended)
+### Project Config (Recommended)
 
-Create file: `D:\_projects\mcp-search-kivest\kilo.json`
-
-```json
-{
-  "mcp": {
-    "kivest-search": {
-      "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
-      "enabled": true,
-      "timeout": 60000
-    }
-  }
-}
-```
-
-### Option 2: VS Code Extension
-
-Create file: `D:\_projects\mcp-search-kivest\.kilocode\mcp.json`
+Create folder and file: `D:\_projects\mcp-search-kivest\.kilocode\mcp.json`
 
 ```json
 {
   "mcpServers": {
     "kivest-search": {
       "command": "node",
-      "args": ["D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
+      "args": ["D:\_projects\mcp-search-kivest\dist\index.js"],
+      "alwaysAllow": [],
       "disabled": false
-    }
-  }
-}
-```
-
-### Option 3: Global Config
-
-Create file: `%USERPROFILE%\.config\kilo\kilo.json`
-
-```json
-{
-  "mcp": {
-    "kivest-search": {
-      "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
-      "enabled": true,
-      "timeout": 60000
     }
   }
 }
@@ -100,8 +50,6 @@ Create file: `%USERPROFILE%\.config\kilo\kilo.json`
 
 ## With API Key (Optional)
 
-Only if you need extended features. Most users skip this.
-
 ### OpenCode
 
 ```json
@@ -110,7 +58,7 @@ Only if you need extended features. Most users skip this.
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
+      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
       "enabled": true,
       "environment": {
         "KIVEST_API_KEY": "your-api-key-here"
@@ -120,19 +68,19 @@ Only if you need extended features. Most users skip this.
 }
 ```
 
-### Kilocode
+### Kilocode VS Code
 
 ```json
 {
-  "mcp": {
+  "mcpServers": {
     "kivest-search": {
-      "type": "local",
-      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
-      "enabled": true,
-      "environment": {
+      "command": "node",
+      "args": ["D:\_projects\mcp-search-kivest\dist\index.js"],
+      "env": {
         "KIVEST_API_KEY": "your-api-key-here"
       },
-      "timeout": 60000
+      "alwaysAllow": [],
+      "disabled": false
     }
   }
 }
@@ -147,20 +95,8 @@ Only if you need extended features. Most users skip this.
    npm run build
    ```
 
-2. **Choose ONE config file** from above (project-level recommended)
+2. **Create the config file** for your AI assistant
 
-3. **Create the file** with the content provided
+3. **Start your AI assistant** in the project directory
 
-4. **Start your AI assistant** in the project directory
-
-5. **Test it:** Ask "What are upcoming celestial events?"
-
----
-
-## Verify Build Exists
-
-```bash
-dir D:\_projects\mcp-search-kivest\dist\index.js
-```
-
-Should show the file exists. If not, run `npm run build`.
+4. **Test it:** Ask "What are upcoming celestial events?"
