@@ -51,6 +51,73 @@ export interface KivestStats {
     done: number;
     failed: number;
 }
+export interface WebSearchResult {
+    title: string;
+    url: string;
+    snippet: string;
+}
+export interface WebSearchResponse {
+    success: boolean;
+    type: 'search';
+    query: string;
+    results: WebSearchResult[];
+}
+export interface ImageResult {
+    title: string;
+    url: string;
+    image_url: string;
+    source: string;
+    resolution: string;
+}
+export interface ImageSearchResponse {
+    success: boolean;
+    type: 'images';
+    query: string;
+    results: ImageResult[];
+}
+export interface VideoResult {
+    title: string;
+    url: string;
+    thumbnail: string;
+    source: string;
+    duration: string;
+}
+export interface VideoSearchResponse {
+    success: boolean;
+    type: 'videos';
+    query: string;
+    results: VideoResult[];
+}
+export interface NewsResult {
+    title: string;
+    url: string;
+    snippet: string;
+    source: string;
+    published_at: string;
+}
+export interface NewsSearchResponse {
+    success: boolean;
+    type: 'news';
+    query: string;
+    results: NewsResult[];
+}
+export interface WebScrapeResponse {
+    success: boolean;
+    type: 'web';
+    url: string;
+    content: string;
+}
+export interface UsageResponse {
+    total: number;
+    endpoints: {
+        '/search': number;
+        '/images': number;
+        '/videos': number;
+        '/news': number;
+        '/web': number;
+        [key: string]: number;
+    };
+}
 export declare class KivestClient {
     private config;
     private limiter;
@@ -77,5 +144,13 @@ export declare class KivestClient {
         concurrency?: number;
     }): Promise<SearchResponse[]>;
     private createErrorResponse;
+    private executeRequest;
+    private scheduleRequest;
+    searchWeb(query: string): Promise<WebSearchResponse>;
+    searchImages(query: string): Promise<ImageSearchResponse>;
+    searchVideos(query: string): Promise<VideoSearchResponse>;
+    searchNews(query: string): Promise<NewsSearchResponse>;
+    scrapeWeb(url: string): Promise<WebScrapeResponse>;
+    getUsage(): Promise<UsageResponse>;
 }
 //# sourceMappingURL=kivest-client.d.ts.map

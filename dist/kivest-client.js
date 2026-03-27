@@ -264,5 +264,70 @@ export class KivestClient {
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
         };
     }
+    async executeRequest(endpoint, jobId) {
+        const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+            method: 'GET',
+        });
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        return response.json();
+    }
+    async scheduleRequest(endpoint) {
+        this.stats.totalRequests++;
+        const jobId = this.generateJobId();
+        const initialTime = Date.now();
+        return this.limiter.schedule({ id: jobId }, async () => {
+            try {
+                const result = await this.executeRequest(endpoint, jobId);
+                this.stats.successfulRequests++;
+                return result;
+            }
+            catch (error) {
+                const errorMsg = error.message;
+                const isRateLimit = errorMsg.includes('429') ||
+                    errorMsg.includes('rate limit') ||
+                    errorMsg.includes('too many requests');
+                if (isRateLimit) {
+                    this.stats.rateLimitedRequests++;
+                    console.error(`[Kivest] Rate limit hit for job ${jobId} - deferring to priority retry queue`);
+                    this.pendingRetries.push({
+                        request: { query: endpoint },
+                        initialTime,
+                        retryCount: 0,
+                        maxRetries: 10,
+                        jobId,
+                    });
+                    throw error;
+                }
+                this.stats.failedRequests++;
+                throw error;
+            }
+        });
+    }
+    async searchWeb(query) {
+        const encodedQuery = encodeURIComponent(query);
+        return this.scheduleRequest(`/search?q=${encodedQuery}`);
+    }
+    async searchImages(query) {
+        const encodedQuery = encodeURIComponent(query);
+        return this.scheduleRequest(`/images?q=${encodedQuery}`);
+    }
+    async searchVideos(query) {
+        const encodedQuery = encodeURIComponent(query);
+        return this.scheduleRequest(`/videos?q=${encodedQuery}`);
+    }
+    async searchNews(query) {
+        const encodedQuery = encodeURIComponent(query);
+        return this.scheduleRequest(`/news?q=${encodedQuery}`);
+    }
+    async scrapeWeb(url) {
+        const encodedUrl = encodeURIComponent(url);
+        return this.scheduleRequest(`/web?url=${encodedUrl}`);
+    }
+    async getUsage() {
+        return this.scheduleRequest('/usage');
+    }
 }
 //# sourceMappingURL=kivest-client.js.map

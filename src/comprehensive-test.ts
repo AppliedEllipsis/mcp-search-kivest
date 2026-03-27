@@ -427,6 +427,122 @@ class ComprehensiveTestRunner {
     this.client.destroy();
   }
 
+  async runNewEndpointTests(): Promise<void> {
+    console.log('\n=== NEW ENDPOINT TESTS ===\n');
+
+    await this.runTest(
+      'Web Search - Basic query',
+      'individual',
+      async () => {
+        const response = await this.client.searchWeb('TypeScript programming');
+        return {
+          success: response.success,
+          type: response.type,
+          query: response.query,
+          resultCount: response.results?.length || 0,
+          firstResult: response.results?.[0] || null,
+        };
+      }
+    );
+
+    await this.runTest(
+      'Image Search - Find cat images',
+      'individual',
+      async () => {
+        const response = await this.client.searchImages('cute cats');
+        return {
+          success: response.success,
+          type: response.type,
+          query: response.query,
+          resultCount: response.results?.length || 0,
+          firstResult: response.results?.[0] || null,
+        };
+      }
+    );
+
+    await this.runTest(
+      'Video Search - Find tutorials',
+      'individual',
+      async () => {
+        const response = await this.client.searchVideos('JavaScript tutorial');
+        return {
+          success: response.success,
+          type: response.type,
+          query: response.query,
+          resultCount: response.results?.length || 0,
+          firstResult: response.results?.[0] || null,
+        };
+      }
+    );
+
+    await this.runTest(
+      'News Search - Current events',
+      'individual',
+      async () => {
+        const response = await this.client.searchNews('artificial intelligence');
+        return {
+          success: response.success,
+          type: response.type,
+          query: response.query,
+          resultCount: response.results?.length || 0,
+          firstResult: response.results?.[0] || null,
+        };
+      }
+    );
+
+    await this.runTest(
+      'Web Scrape - Extract markdown',
+      'individual',
+      async () => {
+        const response = await this.client.scrapeWeb('https://example.com');
+        return {
+          success: response.success,
+          type: response.type,
+          url: response.url,
+          contentLength: response.content?.length || 0,
+          contentPreview: response.content?.substring(0, 200) + '...' || '',
+        };
+      }
+    );
+
+    await this.runTest(
+      'Usage Statistics',
+      'individual',
+      async () => {
+        const response = await this.client.getUsage();
+        return {
+          total: response.total,
+          endpoints: response.endpoints,
+        };
+      }
+    );
+
+    await this.runTest(
+      'Concurrent New Endpoints',
+      'concurrent',
+      async () => {
+        const start = Date.now();
+        const promises = [
+          this.client.searchWeb('concurrent test 1'),
+          this.client.searchImages('concurrent test 2'),
+          this.client.searchVideos('concurrent test 3'),
+        ];
+
+        const results = await Promise.all(promises);
+        const duration = Date.now() - start;
+
+        return {
+          duration: `${duration}ms`,
+          results: results.map((r, i) => ({
+            index: i,
+            type: r.type,
+            success: r.success,
+          })),
+        };
+      }
+    );
+  }
+
   // Run all tests
   async runAll(): Promise<void> {
     console.log('Starting Comprehensive Test Suite...');
@@ -437,6 +553,7 @@ class ComprehensiveTestRunner {
     await this.runConcurrentTests();
     await this.runStressTests();
     await this.runCelestialTests();
+    await this.runNewEndpointTests();
     await this.generateReport();
   }
 }

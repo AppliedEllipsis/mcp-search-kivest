@@ -14,19 +14,23 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { KivestClient, SearchRequest } from './kivest-client.js';
+import {
+  KivestClient,
+  SearchRequest,
+  WebSearchResponse,
+  ImageSearchResponse,
+  VideoSearchResponse,
+  NewsSearchResponse,
+  WebScrapeResponse,
+  UsageResponse,
+} from './kivest-client.js';
 
-const API_KEY = process.env.KIVEST_API_KEY;
-
-if (!API_KEY) {
-  console.error('[Kivest] Warning: KIVEST_API_KEY not set. Some features may be limited.');
-  console.error('[Kivest] Get your free API key at: https://ai.ezif.in/api-key');
-}
+const API_KEY = process.env.KIVEST_API_KEY || '';
 
 const client = new KivestClient({
-  apiKey: API_KEY || '',
+  apiKey: API_KEY,
   requestsPerMinute: 5,
-  maxRetries: 3,
+  maxRetries: 10,
 });
 
 const SEARCH_TOOL: Tool = {
@@ -134,6 +138,90 @@ const MODELS_TOOL: Tool = {
   },
 };
 
+const WEB_SEARCH_TOOL: Tool = {
+  name: 'kivest_web_search',
+  description: 'Search the web and get search results with titles, URLs, and snippets',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The search query',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const IMAGE_SEARCH_TOOL: Tool = {
+  name: 'kivest_image_search',
+  description: 'Search for images and get results with image URLs, titles, and sources',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The image search query',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const VIDEO_SEARCH_TOOL: Tool = {
+  name: 'kivest_video_search',
+  description: 'Search for videos and get results with video URLs, thumbnails, and sources',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The video search query',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const NEWS_SEARCH_TOOL: Tool = {
+  name: 'kivest_news_search',
+  description: 'Search for news articles and get results with titles, sources, and publication dates',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The news search query',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const SCRAPE_WEB_TOOL: Tool = {
+  name: 'kivest_scrape_web',
+  description: 'Scrape a website and return clean markdown content',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      url: {
+        type: 'string',
+        description: 'The URL of the website to scrape',
+      },
+    },
+    required: ['url'],
+  },
+};
+
+const USAGE_TOOL: Tool = {
+  name: 'kivest_usage',
+  description: 'Get usage statistics for all endpoints',
+  inputSchema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
 const server = new Server(
   {
     name: 'kivest-search-mcp',
@@ -148,7 +236,18 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [SEARCH_TOOL, STREAMING_SEARCH_TOOL, STATS_TOOL, MODELS_TOOL],
+    tools: [
+      SEARCH_TOOL,
+      STREAMING_SEARCH_TOOL,
+      STATS_TOOL,
+      MODELS_TOOL,
+      WEB_SEARCH_TOOL,
+      IMAGE_SEARCH_TOOL,
+      VIDEO_SEARCH_TOOL,
+      NEWS_SEARCH_TOOL,
+      SCRAPE_WEB_TOOL,
+      USAGE_TOOL,
+    ],
   };
 });
 
@@ -249,6 +348,110 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(models, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_web_search': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
+
+        console.error(`[MCP] Executing web search: ${args.query}`);
+        const response = await client.searchWeb(args.query);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_image_search': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
+
+        console.error(`[MCP] Executing image search: ${args.query}`);
+        const response = await client.searchImages(args.query);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_video_search': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
+
+        console.error(`[MCP] Executing video search: ${args.query}`);
+        const response = await client.searchVideos(args.query);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_news_search': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
+
+        console.error(`[MCP] Executing news search: ${args.query}`);
+        const response = await client.searchNews(args.query);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_scrape_web': {
+        if (!args || typeof args.url !== 'string') {
+          throw new Error('Missing required parameter: url');
+        }
+
+        console.error(`[MCP] Executing web scrape: ${args.url}`);
+        const response = await client.scrapeWeb(args.url);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_usage': {
+        console.error('[MCP] Executing usage stats request');
+        const response = await client.getUsage();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };

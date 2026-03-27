@@ -41,15 +41,20 @@ npm run build
 
 ## Configuration
 
-### Get API Key
+The Kivest MCP server works without an API key by default. The API key is only required for certain features or higher rate limits.
+
+### Optional: Get API Key
+
+If you need an API key for extended features:
 
 1. Visit [https://ai.ezif.in/api-key](https://ai.ezif.in/api-key)
 2. Sign in with Google (no credit card required)
 3. Copy your API key
 
-### Environment Variables
+### Environment Variables (Optional)
 
 ```bash
+# Only needed if using an API key
 export KIVEST_API_KEY="your-api-key-here"
 ```
 
@@ -59,6 +64,18 @@ export KIVEST_API_KEY="your-api-key-here"
 
 Add to your Claude Desktop config (`claude_desktop_config.json`):
 
+```json
+{
+  "mcpServers": {
+    "kivest-search": {
+      "command": "npx",
+      "args": ["@kivest/mcp-search"]
+    }
+  }
+}
+```
+
+**With API Key (optional):**
 ```json
 {
   "mcpServers": {
@@ -87,6 +104,18 @@ Add to Cursor MCP settings:
   "mcpServers": {
     "kivest-search": {
       "command": "npx",
+      "args": ["-y", "@kivest/mcp-search"]
+    }
+  }
+}
+```
+
+**With API Key (optional):**
+```json
+{
+  "mcpServers": {
+    "kivest-search": {
+      "command": "npx",
       "args": ["-y", "@kivest/mcp-search"],
       "env": {
         "KIVEST_API_KEY": "your-api-key-here"
@@ -100,7 +129,7 @@ Add to Cursor MCP settings:
 
 ### `kivest_search`
 
-Search the web using AI-powered search.
+AI-powered search with comprehensive answers.
 
 **Parameters:**
 - `query` (required): The search query or question
@@ -108,43 +137,60 @@ Search the web using AI-powered search.
 - `maxTokens` (optional): Maximum tokens in response (default: 1024)
 - `temperature` (optional): Temperature 0-2 (default: 0.7)
 
-**Example:**
-```json
-{
-  "query": "What are the latest developments in quantum computing?",
-  "model": "gpt-5.1",
-  "maxTokens": 500
-}
-```
+### `kivest_web_search`
 
-**Available Models:**
+Traditional web search with results (titles, URLs, snippets).
 
-| Model | RPM | Description |
-|-------|-----|-------------|
-| `gpt-5.1` | 4 | Fast, high-quality results |
-| `llama3.1-8B` | Unlimited | Open source Meta model |
-| `deepseek-chat` | 8 | Balanced speed and quality |
-| `qwen3.5-plus` | 8 | Latest Qwen model |
-| `claude-sonnet-4.6` | 1 | Anthropic's latest |
-| `gemini-3-flash-preview` | 1 | Google's fast model |
-| `kimi-k2.5` | 2 | Moonshot AI |
+**Parameters:**
+- `query` (required): The search query
+
+**Returns:** List of web results with title, URL, and snippet.
+
+### `kivest_image_search`
+
+Search for images across the web.
+
+**Parameters:**
+- `query` (required): The image search query
+
+**Returns:** List of images with URLs, resolutions, and sources.
+
+### `kivest_video_search`
+
+Search for videos across platforms.
+
+**Parameters:**
+- `query` (required): The video search query
+
+**Returns:** List of videos with thumbnails and metadata.
+
+### `kivest_news_search`
+
+Search for news articles.
+
+**Parameters:**
+- `query` (required): The news search query
+
+**Returns:** List of news articles with publication dates and sources.
+
+### `kivest_scrape_web`
+
+Scrape a website and return clean markdown (perfect for AI use).
+
+**Parameters:**
+- `url` (required): The URL to scrape
+
+**Returns:** Clean markdown content from the webpage.
+
+### `kivest_usage`
+
+Get usage statistics for your API calls.
+
+**Returns:** Total requests and breakdown by endpoint.
 
 ### `kivest_stats`
 
 Get current rate limiter statistics.
-
-**Returns:**
-```json
-{
-  "queued": 0,
-  "running": 1,
-  "done": 10,
-  "failed": 0,
-  "totalRequests": 10,
-  "successfulRequests": 10,
-  "rateLimitedRequests": 2
-}
-```
 
 ### `kivest_models`
 
@@ -164,7 +210,9 @@ When the rate limit is exceeded:
 1. New requests are queued
 2. Requests are processed as tokens become available
 3. Rate-limited requests are automatically retried
-4. Maximum 3 retry attempts before failing
+4. Maximum **10 retry attempts** before failing completely
+5. Priority-based retry queue - sorted by initial request time
+6. Random 1-10 second cooldown delays during rate limit recovery
 
 ## Testing
 
@@ -190,13 +238,16 @@ npm run test:stress
 ### Test Output
 
 The test suite validates:
-- ✅ Endpoint connectivity
+- ✅ Endpoint connectivity (7 endpoints: AI search, web, images, videos, news, web scrape, usage)
 - ✅ Request/response payloads
-- ✅ Model selection
-- ✅ Rate limiting behavior
-- ✅ Queue management
-- ✅ Automatic requeuing
+- ✅ Model selection (GPT-5.1, LLaMA 3.1, Claude, Gemini, DeepSeek)
+- ✅ Rate limiting behavior with 5 RPM limit
+- ✅ Queue management and overflow handling
+- ✅ Automatic requeuing with priority-based retry
+- ✅ Cooldown delays during rate limit recovery
 - ✅ Stress testing under load
+- ✅ Concurrent request handling
+- ✅ Individual vs concurrent query performance
 
 ## Publishing to npm
 
@@ -260,15 +311,19 @@ npm test
 ```
 mcp-search-kivest/
 ├── src/
-│   ├── index.ts           # Main MCP server entry
-│   ├── kivest-client.ts   # API client with rate limiting
-│   ├── rate-limiter.ts    # Token bucket implementation
-│   ├── test.ts           # Test suite
-│   └── stress-test.ts    # Stress tests
-├── dist/                  # Compiled output
+│   ├── index.ts              # Main MCP server entry
+│   ├── kivest-client.ts      # API client with all endpoints
+│   ├── rate-limiter.ts       # Token bucket implementation
+│   ├── test.ts              # Basic test suite
+│   ├── comprehensive-test.ts # Full test suite with all endpoints
+│   ├── test-celestial.ts    # Celestial events search test
+│   ├── test-aggressive.ts   # Aggressive rate limit test
+│   └── stress-test.ts       # Stress tests
+├── dist/                     # Compiled output
 ├── package.json
 ├── tsconfig.json
-└── README.md
+├── README.md
+└── LICENSE
 ```
 
 ## API Reference
@@ -294,8 +349,8 @@ mcp-search-kivest/
 - Use `llama3.1-8B` model for unlimited requests
 
 ### "KIVEST_API_KEY not set"
-- Ensure the environment variable is set
-- Check your MCP client configuration
+- This is optional - the server works without an API key
+- If using an API key, ensure the environment variable is set
 - Verify the API key at [https://ai.ezif.in/api-key](https://ai.ezif.in/api-key)
 
 ### "Queue is full"

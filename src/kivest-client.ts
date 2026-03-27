@@ -58,6 +58,83 @@ export interface KivestStats {
   failed: number;
 }
 
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export interface WebSearchResponse {
+  success: boolean;
+  type: 'search';
+  query: string;
+  results: WebSearchResult[];
+}
+
+export interface ImageResult {
+  title: string;
+  url: string;
+  image_url: string;
+  source: string;
+  resolution: string;
+}
+
+export interface ImageSearchResponse {
+  success: boolean;
+  type: 'images';
+  query: string;
+  results: ImageResult[];
+}
+
+export interface VideoResult {
+  title: string;
+  url: string;
+  thumbnail: string;
+  source: string;
+  duration: string;
+}
+
+export interface VideoSearchResponse {
+  success: boolean;
+  type: 'videos';
+  query: string;
+  results: VideoResult[];
+}
+
+export interface NewsResult {
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+  published_at: string;
+}
+
+export interface NewsSearchResponse {
+  success: boolean;
+  type: 'news';
+  query: string;
+  results: NewsResult[];
+}
+
+export interface WebScrapeResponse {
+  success: boolean;
+  type: 'web';
+  url: string;
+  content: string;
+}
+
+export interface UsageResponse {
+  total: number;
+  endpoints: {
+    '/search': number;
+    '/images': number;
+    '/videos': number;
+    '/news': number;
+    '/web': number;
+    [key: string]: number;
+  };
+}
+
 interface PendingRetry {
   request: SearchRequest;
   initialTime: number;
@@ -378,5 +455,85 @@ export class KivestClient {
       }],
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     };
+  }
+
+  private async executeRequest<T>(endpoint: string, jobId: string): Promise<T> {
+    const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  private async scheduleRequest<T>(endpoint: string): Promise<T> {
+    this.stats.totalRequests++;
+    const jobId = this.generateJobId();
+    const initialTime = Date.now();
+
+    return this.limiter.schedule({ id: jobId }, async () => {
+      try {
+        const result = await this.executeRequest<T>(endpoint, jobId);
+        this.stats.successfulRequests++;
+        return result;
+      } catch (error) {
+        const errorMsg = (error as Error).message;
+        const isRateLimit =
+          errorMsg.includes('429') ||
+          errorMsg.includes('rate limit') ||
+          errorMsg.includes('too many requests');
+
+        if (isRateLimit) {
+          this.stats.rateLimitedRequests++;
+          console.error(`[Kivest] Rate limit hit for job ${jobId} - deferring to priority retry queue`);
+
+          this.pendingRetries.push({
+            request: { query: endpoint } as SearchRequest,
+            initialTime,
+            retryCount: 0,
+            maxRetries: 10,
+            jobId,
+          });
+
+          throw error;
+        }
+
+        this.stats.failedRequests++;
+        throw error;
+      }
+    });
+  }
+
+  async searchWeb(query: string): Promise<WebSearchResponse> {
+    const encodedQuery = encodeURIComponent(query);
+    return this.scheduleRequest<WebSearchResponse>(`/search?q=${encodedQuery}`);
+  }
+
+  async searchImages(query: string): Promise<ImageSearchResponse> {
+    const encodedQuery = encodeURIComponent(query);
+    return this.scheduleRequest<ImageSearchResponse>(`/images?q=${encodedQuery}`);
+  }
+
+  async searchVideos(query: string): Promise<VideoSearchResponse> {
+    const encodedQuery = encodeURIComponent(query);
+    return this.scheduleRequest<VideoSearchResponse>(`/videos?q=${encodedQuery}`);
+  }
+
+  async searchNews(query: string): Promise<NewsSearchResponse> {
+    const encodedQuery = encodeURIComponent(query);
+    return this.scheduleRequest<NewsSearchResponse>(`/news?q=${encodedQuery}`);
+  }
+
+  async scrapeWeb(url: string): Promise<WebScrapeResponse> {
+    const encodedUrl = encodeURIComponent(url);
+    return this.scheduleRequest<WebScrapeResponse>(`/web?url=${encodedUrl}`);
+  }
+
+  async getUsage(): Promise<UsageResponse> {
+    return this.scheduleRequest<UsageResponse>('/usage');
   }
 }
