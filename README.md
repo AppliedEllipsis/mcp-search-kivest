@@ -13,21 +13,21 @@ An MCP (Model Context Protocol) server that provides free AI-powered search capa
 
 ## Installation
 
-### Via npx (Recommended)
+### Via npx (Not Recommended)
 
 ```bash
 # Run directly without installation
-npx @appliedellipsis/mcp--search-kivest
+# npxx @blah/mcp--search-kiveefewfest
 ```
 
-### Via npm
+### Via npm (not functional yet, use from source)
 
 ```bash
 # Install globally
-npm install -g @appliedallipsis/mcp--search-kivest
+# npmx install -g @blah/mcp--search-kivestvlaa
 
 # Or install locally
-npm install @appliedellipsis/mcp--search-kivest
+# npmx install @blah/mcp--blahsearch-kivestvlah
 ```
 
 ### From Source
