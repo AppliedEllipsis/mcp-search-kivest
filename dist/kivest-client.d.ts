@@ -55,26 +55,27 @@ export declare class KivestClient {
     private config;
     private limiter;
     private stats;
-    private isInCooldown;
-    private cooldownEndTime;
-    private cooldownDelay;
+    private pendingRetries;
+    private isProcessingRetries;
     constructor(config: KivestConfig);
     private createLimiter;
     private setupRetryHandler;
-    private getHeaders;
-    private generateJobId;
+    private startRetryProcessor;
+    private processRetries;
+    private executeSearch;
     search(request: SearchRequest): Promise<SearchResponse>;
-    searchStream(request: SearchRequest): AsyncGenerator<StreamChunk, void, unknown>;
-    searchWithModel(query: string, model: string, options?: Omit<SearchRequest, 'query' | 'model'>): Promise<SearchResponse>;
-    batchSearch(requests: SearchRequest[], options?: {
-        concurrency?: number;
-    }): Promise<SearchResponse[]>;
-    getStats(): Promise<KivestStats & typeof this.stats>;
+    private generateJobId;
+    getStats(): Promise<KivestStats & typeof this.stats & {
+        pendingRetries: number;
+    }>;
     canExecute(): boolean;
     getEstimatedWaitTime(): number;
     destroy(): void;
-    private transformResponse;
-    private transformSimpleResponse;
+    searchWithModel(query: string, model: string, options?: Omit<SearchRequest, 'query' | 'model'>): Promise<SearchResponse>;
+    searchStream(request: SearchRequest): AsyncGenerator<StreamChunk, void, unknown>;
+    batchSearch(requests: SearchRequest[], options?: {
+        concurrency?: number;
+    }): Promise<SearchResponse[]>;
     private createErrorResponse;
 }
 //# sourceMappingURL=kivest-client.d.ts.map

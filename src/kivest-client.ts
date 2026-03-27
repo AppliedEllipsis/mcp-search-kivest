@@ -58,6 +58,14 @@ export interface KivestStats {
   failed: number;
 }
 
+interface PendingRetry {
+  request: SearchRequest;
+  initialTime: number;
+  retryCount: number;
+  maxRetries: number;
+  jobId: string;
+}
+
 export class KivestClient {
   private config: Required<KivestConfig>;
   private limiter: Bottleneck;
@@ -67,20 +75,20 @@ export class KivestClient {
     failedRequests: 0,
     rateLimitedRequests: 0,
   };
-  private isInCooldown = false;
-  private cooldownEndTime = 0;
-  private cooldownDelay = 0;
+  private pendingRetries: PendingRetry[] = [];
+  private isProcessingRetries = false;
 
   constructor(config: KivestConfig) {
     this.config = {
       apiKey: config.apiKey,
       baseUrl: config.baseUrl || 'https://se.ezif.in',
       requestsPerMinute: config.requestsPerMinute || 5,
-      maxRetries: config.maxRetries || 3,
+      maxRetries: config.maxRetries || 10,
     };
 
     this.limiter = this.createLimiter();
     this.setupRetryHandler();
+    this.startRetryProcessor();
   }
 
   private createLimiter(): Bottleneck {
@@ -99,7 +107,7 @@ export class KivestClient {
     this.limiter.on('failed', async (error, jobInfo) => {
       const retryCount = jobInfo.retryCount;
       
-      if (retryCount >= this.config.maxRetries) {
+      if (retryCount >= 3) {
         return;
       }
 
@@ -111,88 +119,77 @@ export class KivestClient {
 
       if (isRateLimit) {
         this.stats.rateLimitedRequests++;
-        
-        // Enter cooldown mode with random 1-10 second delay
-        const cooldownMs = Math.floor(Math.random() * 9000) + 1000; // 1-10 seconds
-        this.isInCooldown = true;
-        this.cooldownDelay = cooldownMs;
-        this.cooldownEndTime = Date.now() + cooldownMs;
-        
-        console.error(`[Kivest] Rate limit detected for provider "Kivest" - entering cooldown for ${cooldownMs}ms`);
-        console.error(`[Kivest] Queue paused. Will resume at position 5 after cooldown.`);
-        
-        // Return the cooldown delay to requeue at position 5
-        return cooldownMs;
+        console.error(`[Kivest] Rate limit detected - deferring to retry queue with priority based on initial time`);
+        return 0;
       }
 
       console.error(`[Kivest] Request failed (attempt ${retryCount + 1}), retrying...`);
       return Math.pow(2, retryCount) * 1000;
     });
-
-    this.limiter.on('retry', (error, jobInfo) => {
-      console.error(`[Kivest] Retrying job ${jobInfo.options.id} (attempt ${jobInfo.retryCount + 1}) after cooldown`);
-      
-      // Check if we're exiting cooldown
-      if (this.isInCooldown && Date.now() >= this.cooldownEndTime) {
-        this.isInCooldown = false;
-        console.error(`[Kivest] Cooldown complete - resuming normal queue processing`);
-      }
-    });
   }
 
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (this.config.apiKey && this.config.apiKey.length > 0) {
-      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+  private startRetryProcessor(): void {
+    setInterval(() => {
+      this.processRetries();
+    }, 1000);
+  }
+
+  private async processRetries(): Promise<void> {
+    if (this.isProcessingRetries || this.pendingRetries.length === 0) {
+      return;
     }
-    
-    return headers;
-  }
 
-  private generateJobId(): string {
-    return `search-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  }
+    this.isProcessingRetries = true;
 
-  async search(request: SearchRequest): Promise<SearchResponse> {
-    this.stats.totalRequests++;
-
-    return this.limiter.schedule({ id: this.generateJobId() }, async () => {
-      const encodedQuery = encodeURIComponent(request.query);
-      const response = await fetch(`${this.config.baseUrl}/ai?q=${encodedQuery}`, {
-        method: 'GET',
+    try {
+      const now = Date.now();
+      
+      const readyRetries = this.pendingRetries.filter(pr => {
+        const delay = Math.floor(Math.random() * 9000) + 1000;
+        return now >= pr.initialTime + (pr.retryCount * delay);
       });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
+      readyRetries.sort((a, b) => a.initialTime - b.initialTime);
 
-      const data: any = await response.json();
-      this.stats.successfulRequests++;
-      
-      return this.transformSimpleResponse(data.answer || data, request.model || 'gpt-5.1');
-    });
+      for (const retry of readyRetries.slice(0, 5)) {
+        const index = this.pendingRetries.indexOf(retry);
+        if (index > -1) {
+          this.pendingRetries.splice(index, 1);
+        }
+
+        console.error(`[Kivest] Processing retry for job ${retry.jobId} (attempt ${retry.retryCount + 1}/${retry.maxRetries})`);
+
+        try {
+          const result = await this.executeSearch(retry.request, retry.jobId);
+          this.stats.successfulRequests++;
+          console.error(`[Kivest] Retry succeeded for job ${retry.jobId}`);
+        } catch (error) {
+          const errorMsg = (error as Error).message;
+          const isRateLimit = 
+            errorMsg.includes('429') ||
+            errorMsg.includes('rate limit');
+
+          if (isRateLimit && retry.retryCount < retry.maxRetries - 1) {
+            console.error(`[Kivest] Still rate limited, requeuing for later retry`);
+            this.pendingRetries.push({
+              ...retry,
+              retryCount: retry.retryCount + 1,
+            });
+          } else {
+            console.error(`[Kivest] Max retries exceeded for job ${retry.jobId}`);
+            this.stats.failedRequests++;
+          }
+        }
+      }
+    } finally {
+      this.isProcessingRetries = false;
+    }
   }
 
-  async *searchStream(request: SearchRequest): AsyncGenerator<StreamChunk, void, unknown> {
-    this.stats.totalRequests++;
-
-    const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        model: request.model || 'gpt-5.1',
-        messages: [
-          { role: 'user', content: request.query }
-        ],
-        stream: true,
-        max_tokens: request.maxTokens ?? 1024,
-        temperature: request.temperature ?? 0.7,
-        top_p: request.topP ?? 0.9,
-      }),
+  private async executeSearch(request: SearchRequest, jobId: string): Promise<SearchResponse> {
+    const encodedQuery = encodeURIComponent(request.query);
+    const response = await fetch(`${this.config.baseUrl}/ai?q=${encodedQuery}`, {
+      method: 'GET',
     });
 
     if (!response.ok) {
@@ -200,45 +197,95 @@ export class KivestClient {
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    if (!response.body) {
-      throw new Error('No response body for stream');
-    }
+    const data: any = await response.json();
+    
+    return {
+      id: jobId,
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model: request.model || 'kivest-search',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: data.answer || String(data),
+        },
+        finishReason: 'stop',
+      }],
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      },
+    };
+  }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+  async search(request: SearchRequest): Promise<SearchResponse> {
+    this.stats.totalRequests++;
+    const jobId = this.generateJobId();
+    const initialTime = Date.now();
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
+    return this.limiter.schedule({ id: jobId }, async () => {
+      try {
+        const result = await this.executeSearch(request, jobId);
+        this.stats.successfulRequests++;
+        return result;
+      } catch (error) {
+        const errorMsg = (error as Error).message;
+        const isRateLimit = 
+          errorMsg.includes('429') ||
+          errorMsg.includes('rate limit') ||
+          errorMsg.includes('too many requests');
+
+        if (isRateLimit) {
+          this.stats.rateLimitedRequests++;
+          console.error(`[Kivest] Rate limit hit for job ${jobId} - deferring to priority retry queue`);
           
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(trimmed.slice(6));
-              if (json.choices) {
-                this.stats.successfulRequests++;
-                yield json as StreamChunk;
-              }
-            } catch (e) {
-              console.error('[Kivest] Failed to parse stream chunk:', e);
-            }
-          }
+          this.pendingRetries.push({
+            request,
+            initialTime,
+            retryCount: 0,
+            maxRetries: 10,
+            jobId,
+          });
+
+          throw error;
         }
+
+        this.stats.failedRequests++;
+        throw error;
       }
-    } finally {
-      reader.releaseLock();
-    }
+    });
+  }
+
+  private generateJobId(): string {
+    return `search-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  async getStats(): Promise<KivestStats & typeof this.stats & { pendingRetries: number }> {
+    return {
+      queued: this.limiter.queued() + this.pendingRetries.length,
+      running: await this.limiter.running(),
+      done: await this.limiter.done(),
+      failed: 0,
+      ...this.stats,
+      pendingRetries: this.pendingRetries.length,
+    };
+  }
+
+  canExecute(): boolean {
+    return this.limiter.queued() < 50;
+  }
+
+  getEstimatedWaitTime(): number {
+    const queued = this.limiter.queued() + this.pendingRetries.length;
+    if (queued === 0) return 0;
+    return Math.ceil(queued / this.config.requestsPerMinute) * 60 * 1000;
+  }
+
+  destroy(): void {
+    this.limiter.stop();
+    this.pendingRetries = [];
   }
 
   async searchWithModel(
@@ -251,6 +298,49 @@ export class KivestClient {
       model,
       ...options,
     });
+  }
+
+  async *searchStream(request: SearchRequest): AsyncGenerator<StreamChunk, void, unknown> {
+    this.stats.totalRequests++;
+
+    const response = await fetch(`${this.config.baseUrl}/ai?q=${encodeURIComponent(request.query)}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data: any = await response.json();
+    this.stats.successfulRequests++;
+
+    yield {
+      id: this.generateJobId(),
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: request.model || 'kivest-search',
+      choices: [{
+        index: 0,
+        delta: {
+          role: 'assistant',
+          content: data.answer || String(data),
+        },
+        finishReason: null,
+      }],
+    };
+
+    yield {
+      id: this.generateJobId(),
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: request.model || 'kivest-search',
+      choices: [{
+        index: 0,
+        delta: {},
+        finishReason: 'stop',
+      }],
+    };
   }
 
   async batchSearch(
@@ -269,74 +359,6 @@ export class KivestClient {
     }
     
     return results;
-  }
-
-  async getStats(): Promise<KivestStats & typeof this.stats> {
-    return {
-      queued: this.limiter.queued(),
-      running: await this.limiter.running(),
-      done: await this.limiter.done(),
-      failed: 0,
-      ...this.stats,
-    };
-  }
-
-  canExecute(): boolean {
-    return this.limiter.queued() < 50;
-  }
-
-  getEstimatedWaitTime(): number {
-    const queued = this.limiter.queued();
-    if (queued === 0) return 0;
-    return Math.ceil(queued / this.config.requestsPerMinute) * 60 * 1000;
-  }
-
-  destroy(): void {
-    this.limiter.stop();
-  }
-
-  private transformResponse(data: any): SearchResponse {
-    return {
-      id: data.id,
-      object: data.object,
-      created: data.created,
-      model: data.model,
-      choices: data.choices.map((choice: any) => ({
-        index: choice.index,
-        message: {
-          role: choice.message.role,
-          content: choice.message.content,
-        },
-        finishReason: choice.finish_reason,
-      })),
-      usage: {
-        promptTokens: data.usage?.prompt_tokens || 0,
-        completionTokens: data.usage?.completion_tokens || 0,
-        totalTokens: data.usage?.total_tokens || 0,
-      },
-    };
-  }
-
-  private transformSimpleResponse(text: string, model: string): SearchResponse {
-    return {
-      id: `search-${Date.now()}`,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: model,
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: text,
-        },
-        finishReason: 'stop',
-      }],
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      },
-    };
   }
 
   private createErrorResponse(error: unknown): SearchResponse {
