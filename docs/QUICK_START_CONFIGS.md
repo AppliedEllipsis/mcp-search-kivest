@@ -18,7 +18,7 @@ Create file: `D:\_projects\mcp-search-kivest\opencode.json`
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true
     }
   }
@@ -35,7 +35,7 @@ Create file: `%USERPROFILE%\.config\opencode\opencode.json`
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true
     }
   }
@@ -55,7 +55,7 @@ Create file: `D:\_projects\mcp-search-kivest\kilo.json`
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true,
       "timeout": 60000
     }
@@ -72,7 +72,7 @@ Create file: `D:\_projects\mcp-search-kivest\.kilocode\mcp.json`
   "mcpServers": {
     "kivest-search": {
       "command": "node",
-      "args": ["D:\_projects\mcp-search-kivest\dist\index.js"],
+      "args": ["D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "disabled": false
     }
   }
@@ -88,7 +88,7 @@ Create file: `%USERPROFILE%\.config\kilo\kilo.json`
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true,
       "timeout": 60000
     }
@@ -110,7 +110,7 @@ Only if you need extended features. Most users skip this.
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true,
       "environment": {
         "KIVEST_API_KEY": "your-api-key-here"
@@ -127,7 +127,7 @@ Only if you need extended features. Most users skip this.
   "mcp": {
     "kivest-search": {
       "type": "local",
-      "command": ["node", "D:\_projects\mcp-search-kivest\dist\index.js"],
+      "command": ["node", "D:\\_projects\\mcp-search-kivest\\dist\\index.js"],
       "enabled": true,
       "environment": {
         "KIVEST_API_KEY": "your-api-key-here"
