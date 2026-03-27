@@ -1,6 +1,6 @@
 # Kivest AI Search MCP Server
 
-An MCP (Model Context Protocol) server that provides AI-powered search capabilities using the [Kivest AI Search API](https://se.ezif.in) with intelligent rate limiting and request queuing.
+An MCP (Model Context Protocol) server that provides free AI-powered search capabilities using the [Kivest AI Search API](https://se.ezif.in) with intelligent rate limiting and request queuing.
 
 ## Features
 
@@ -366,11 +366,21 @@ MIT
 
 Contributions welcome! Please read the [Contributing Guide](CONTRIBUTING.md) first.
 
-## Support
 
-- Discord: [https://discord.gg/z6bZZF4rme](https://discord.gg/z6bZZF4rme)
-- Issues: [GitHub Issues](https://github.com/yourusername/mcp-search-kivest/issues)
+### Support This Project ❤️
+
+If you find this extension useful, then please support its continued development:
+
+**Crypto Donation**
+
+If you'd prefer to donate directly via cryptocurrency, you can send Bitcoin to:
+
+```
+bc1q8nrdytlvms0a0zurp04xwfppflcxwgpyrzw5hn
+```
+
+Thank you for supporting free and open source software! 🙏
 
 ---
 
-Built with ❤️ for the MCP community
+_Co-vibe coded with AI - Built with human creativity enhanced by artificial intelligence_
