@@ -56,7 +56,7 @@ async function testAggressiveRateLimiting() {
   
   if (failed.length > 0) {
     console.log(`\nFailed queries:`);
-    failed.forEach(r => console.log(`  Query ${r.index + 1}: ${r.error?.substring(0, 80)}`));
+    failed.forEach(r => console.log(`  Query ${r.index + 1}: ${(r as any).error?.substring(0, 80) || 'Unknown error'}`));
   }
   
   const stats = await client.getStats();

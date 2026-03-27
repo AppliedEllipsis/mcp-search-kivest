@@ -55,6 +55,9 @@ export declare class KivestClient {
     private config;
     private limiter;
     private stats;
+    private isInCooldown;
+    private cooldownEndTime;
+    private cooldownDelay;
     constructor(config: KivestConfig);
     private createLimiter;
     private setupRetryHandler;

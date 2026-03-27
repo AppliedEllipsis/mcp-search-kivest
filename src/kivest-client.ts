@@ -67,6 +67,9 @@ export class KivestClient {
     failedRequests: 0,
     rateLimitedRequests: 0,
   };
+  private isInCooldown = false;
+  private cooldownEndTime = 0;
+  private cooldownDelay = 0;
 
   constructor(config: KivestConfig) {
     this.config = {
@@ -108,8 +111,18 @@ export class KivestClient {
 
       if (isRateLimit) {
         this.stats.rateLimitedRequests++;
-        console.error(`[Kivest] Rate limit detected for provider "Kivest", retry ${retryCount + 1}/${this.config.maxRetries}, requeuing...`);
-        return 15000;
+        
+        // Enter cooldown mode with random 1-10 second delay
+        const cooldownMs = Math.floor(Math.random() * 9000) + 1000; // 1-10 seconds
+        this.isInCooldown = true;
+        this.cooldownDelay = cooldownMs;
+        this.cooldownEndTime = Date.now() + cooldownMs;
+        
+        console.error(`[Kivest] Rate limit detected for provider "Kivest" - entering cooldown for ${cooldownMs}ms`);
+        console.error(`[Kivest] Queue paused. Will resume at position 5 after cooldown.`);
+        
+        // Return the cooldown delay to requeue at position 5
+        return cooldownMs;
       }
 
       console.error(`[Kivest] Request failed (attempt ${retryCount + 1}), retrying...`);
@@ -117,7 +130,13 @@ export class KivestClient {
     });
 
     this.limiter.on('retry', (error, jobInfo) => {
-      console.error(`[Kivest] Retrying job ${jobInfo.options.id} (attempt ${jobInfo.retryCount + 1})`);
+      console.error(`[Kivest] Retrying job ${jobInfo.options.id} (attempt ${jobInfo.retryCount + 1}) after cooldown`);
+      
+      // Check if we're exiting cooldown
+      if (this.isInCooldown && Date.now() >= this.cooldownEndTime) {
+        this.isInCooldown = false;
+        console.error(`[Kivest] Cooldown complete - resuming normal queue processing`);
+      }
     });
   }
 
