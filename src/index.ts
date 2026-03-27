@@ -19,13 +19,12 @@ import { KivestClient, SearchRequest } from './kivest-client.js';
 const API_KEY = process.env.KIVEST_API_KEY;
 
 if (!API_KEY) {
-  console.error('Error: KIVEST_API_KEY environment variable is required');
-  console.error('Get your API key at: https://ai.ezif.in/api-key');
-  process.exit(1);
+  console.error('[Kivest] Warning: KIVEST_API_KEY not set. Some features may be limited.');
+  console.error('[Kivest] Get your free API key at: https://ai.ezif.in/api-key');
 }
 
 const client = new KivestClient({
-  apiKey: API_KEY,
+  apiKey: API_KEY || '',
   requestsPerMinute: 5,
   maxRetries: 3,
 });
@@ -43,6 +42,46 @@ Models:
 - qwen3.5-plus: Latest Qwen model (8 RPM limit)
 
 Best for: Current events, factual queries, general knowledge.
+  `.trim(),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'The search query or question',
+      },
+      model: {
+        type: 'string',
+        description: 'AI model to use (default: gpt-5.1)',
+        enum: [
+          'gpt-5.1',
+          'llama3.1-8B',
+          'deepseek-chat',
+          'qwen3.5-plus',
+          'claude-sonnet-4.6',
+          'gemini-3-flash-preview',
+          'kimi-k2.5',
+        ],
+      },
+      maxTokens: {
+        type: 'number',
+        description: 'Maximum tokens in response (default: 1024)',
+      },
+      temperature: {
+        type: 'number',
+        description: 'Temperature for response randomness 0-2 (default: 0.7)',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const STREAMING_SEARCH_TOOL: Tool = {
+  name: 'kivest_search_stream',
+  description: `
+Search the web using Kivest AI Search API with streaming response. 
+Returns response tokens as they are generated for real-time feedback.
+Supports the same models as kivest_search.
   `.trim(),
   inputSchema: {
     type: 'object',
@@ -109,7 +148,7 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [SEARCH_TOOL, STATS_TOOL, MODELS_TOOL],
+    tools: [SEARCH_TOOL, STREAMING_SEARCH_TOOL, STATS_TOOL, MODELS_TOOL],
   };
 });
 
@@ -151,12 +190,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'kivest_stats': {
-        const stats = client.getStats();
+        const stats = await client.getStats();
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify(stats, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'kivest_search_stream': {
+        if (!args || typeof args.query !== 'string') {
+          throw new Error('Missing required parameter: query');
+        }
+        const streamRequest: SearchRequest = {
+          query: args.query,
+          model: typeof args.model === 'string' ? args.model : 'gpt-5.1',
+          maxTokens: typeof args.maxTokens === 'number' ? args.maxTokens : 1024,
+          temperature: typeof args.temperature === 'number' ? args.temperature : 0.7,
+          stream: true,
+        };
+
+        console.error(`[MCP] Executing streaming search: ${streamRequest.query}`);
+        
+        const chunks: string[] = [];
+        for await (const chunk of client.searchStream(streamRequest)) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            chunks.push(content);
+          }
+        }
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: chunks.join(''),
             },
           ],
         };

@@ -5,12 +5,7 @@
 
 import { KivestClient, SearchRequest } from './kivest-client.js';
 
-const API_KEY = process.env.KIVEST_API_KEY;
-
-if (!API_KEY) {
-  console.error('Error: KIVEST_API_KEY environment variable is required');
-  process.exit(1);
-}
+const API_KEY = process.env.KIVEST_API_KEY || '';
 
 interface StressResult {
   timestamp: string;
@@ -48,8 +43,8 @@ async function runStressTest(
     maxTokens: 50,
   }));
   
-  const updateStats = () => {
-    const stats = client.getStats();
+  const updateStats = async () => {
+    const stats = await client.getStats();
     maxQueueDepth = Math.max(maxQueueDepth, stats.queued);
     process.stdout.write(`\rQueue: ${stats.queued} | Running: ${stats.running} | Done: ${stats.done} | Failed: ${failedCount}`);
   };
@@ -87,7 +82,7 @@ async function runStressTest(
         timestamps.push(Date.now() - reqStart);
         failedCount++;
       }
-      updateStats();
+      await updateStats();
     }
   }
   
@@ -95,13 +90,14 @@ async function runStressTest(
   console.log('\n');
   
   const totalDuration = Date.now() - startTime;
+  const finalStats = await client.getStats();
   
   return {
     timestamp: new Date().toISOString(),
     totalRequests: requestCount,
     completed: completedCount,
     failed: failedCount,
-    rateLimited: client.getStats().rateLimitedRequests,
+    rateLimited: finalStats.rateLimitedRequests,
     avgResponseTime: timestamps.length > 0 
       ? timestamps.reduce((a, b) => a + b, 0) / timestamps.length 
       : 0,

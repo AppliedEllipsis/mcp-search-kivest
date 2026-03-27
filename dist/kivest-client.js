@@ -1,9 +1,3 @@
-/**
- * Kivest AI Search API Client with Rate Limiting
- *
- * Wraps the Kivest AI Search API with intelligent rate limiting
- * and automatic request queuing/requeuing.
- */
 import Bottleneck from 'bottleneck';
 export class KivestClient {
     config;
@@ -17,7 +11,7 @@ export class KivestClient {
     constructor(config) {
         this.config = {
             apiKey: config.apiKey,
-            baseUrl: config.baseUrl || 'https://ai.ezif.in/v1',
+            baseUrl: config.baseUrl || 'https://se.ezif.in',
             requestsPerMinute: config.requestsPerMinute || 5,
             maxRetries: config.maxRetries || 3,
         };
@@ -47,35 +41,34 @@ export class KivestClient {
                 errorMessage.includes('too many requests');
             if (isRateLimit) {
                 this.stats.rateLimitedRequests++;
-                console.log(`[Kivest] Rate limited (attempt ${retryCount + 1}), requeuing...`);
+                console.error(`[Kivest] Rate limit detected for provider "Kivest", retry ${retryCount + 1}/${this.config.maxRetries}, requeuing...`);
                 return 15000;
             }
-            console.log(`[Kivest] Request failed (attempt ${retryCount + 1}), retrying...`);
+            console.error(`[Kivest] Request failed (attempt ${retryCount + 1}), retrying...`);
             return Math.pow(2, retryCount) * 1000;
         });
         this.limiter.on('retry', (error, jobInfo) => {
-            console.log(`[Kivest] Retrying job ${jobInfo.options.id} (attempt ${jobInfo.retryCount + 1})`);
+            console.error(`[Kivest] Retrying job ${jobInfo.options.id} (attempt ${jobInfo.retryCount + 1})`);
         });
+    }
+    getHeaders() {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (this.config.apiKey && this.config.apiKey.length > 0) {
+            headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+        }
+        return headers;
+    }
+    generateJobId() {
+        return `search-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     }
     async search(request) {
         this.stats.totalRequests++;
-        return this.limiter.schedule({ id: `search-${Date.now()}` }, async () => {
-            const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.config.apiKey}`,
-                },
-                body: JSON.stringify({
-                    model: request.model || 'gpt-5.1',
-                    messages: [
-                        { role: 'user', content: request.query }
-                    ],
-                    stream: request.stream ?? false,
-                    max_tokens: request.maxTokens ?? 1024,
-                    temperature: request.temperature ?? 0.7,
-                    top_p: request.topP ?? 0.9,
-                }),
+        return this.limiter.schedule({ id: this.generateJobId() }, async () => {
+            const encodedQuery = encodeURIComponent(request.query);
+            const response = await fetch(`${this.config.baseUrl}/ai?q=${encodedQuery}`, {
+                method: 'GET',
             });
             if (!response.ok) {
                 const errorText = await response.text().catch(() => 'Unknown error');
@@ -83,8 +76,65 @@ export class KivestClient {
             }
             const data = await response.json();
             this.stats.successfulRequests++;
-            return this.transformResponse(data);
+            return this.transformSimpleResponse(data.answer || data, request.model || 'gpt-5.1');
         });
+    }
+    async *searchStream(request) {
+        this.stats.totalRequests++;
+        const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                model: request.model || 'gpt-5.1',
+                messages: [
+                    { role: 'user', content: request.query }
+                ],
+                stream: true,
+                max_tokens: request.maxTokens ?? 1024,
+                temperature: request.temperature ?? 0.7,
+                top_p: request.topP ?? 0.9,
+            }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        if (!response.body) {
+            throw new Error('No response body for stream');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done)
+                    break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed === 'data: [DONE]')
+                        continue;
+                    if (trimmed.startsWith('data: ')) {
+                        try {
+                            const json = JSON.parse(trimmed.slice(6));
+                            if (json.choices) {
+                                this.stats.successfulRequests++;
+                                yield json;
+                            }
+                        }
+                        catch (e) {
+                            console.error('[Kivest] Failed to parse stream chunk:', e);
+                        }
+                    }
+                }
+            }
+        }
+        finally {
+            reader.releaseLock();
+        }
     }
     async searchWithModel(query, model, options) {
         return this.search({
@@ -106,12 +156,12 @@ export class KivestClient {
         }
         return results;
     }
-    getStats() {
+    async getStats() {
         return {
             queued: this.limiter.queued(),
-            running: this.limiter.running(),
-            done: this.limiter.done(),
-            failed: this.limiter.jobStatus(this.limiter.DONE).failed || 0,
+            running: await this.limiter.running(),
+            done: await this.limiter.done(),
+            failed: 0,
             ...this.stats,
         };
     }
@@ -145,6 +195,27 @@ export class KivestClient {
                 promptTokens: data.usage?.prompt_tokens || 0,
                 completionTokens: data.usage?.completion_tokens || 0,
                 totalTokens: data.usage?.total_tokens || 0,
+            },
+        };
+    }
+    transformSimpleResponse(text, model) {
+        return {
+            id: `search-${Date.now()}`,
+            object: 'chat.completion',
+            created: Math.floor(Date.now() / 1000),
+            model: model,
+            choices: [{
+                    index: 0,
+                    message: {
+                        role: 'assistant',
+                        content: text,
+                    },
+                    finishReason: 'stop',
+                }],
+            usage: {
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
             },
         };
     }

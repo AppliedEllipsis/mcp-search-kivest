@@ -5,13 +5,7 @@
 
 import { KivestClient, SearchRequest } from './kivest-client.js';
 
-const API_KEY = process.env.KIVEST_API_KEY;
-
-if (!API_KEY) {
-  console.error('Error: KIVEST_API_KEY environment variable is required');
-  console.error('Get your API key at: https://ai.ezif.in/api-key');
-  process.exit(1);
-}
+const API_KEY = process.env.KIVEST_API_KEY || '';
 
 interface TestResult {
   name: string;
@@ -128,6 +122,7 @@ class TestRunner {
       const duration = Date.now() - start;
       
       const successCount = results.filter(r => r.id !== 'error').length;
+      const stats = await this.client.getStats();
       
       return {
         totalRequests: requests.length,
@@ -150,7 +145,7 @@ class TestRunner {
       const results = await this.client.batchSearch(requests);
       const duration = Date.now() - start;
       
-      const stats = this.client.getStats();
+      const stats = await this.client.getStats();
       
       return {
         totalRequests: requests.length,
@@ -185,7 +180,7 @@ class TestRunner {
       const results = await Promise.all(promises);
       const duration = Date.now() - start;
       
-      const stats = this.client.getStats();
+      const stats = await this.client.getStats()
       
       return {
         totalRequests: 7,
@@ -199,7 +194,7 @@ class TestRunner {
 
   async testStats(): Promise<void> {
     await this.runTest('Stats Test - Get Rate Limiter Stats', async () => {
-      const stats = this.client.getStats();
+      const stats = await this.client.getStats();
       
       return {
         queued: stats.queued,

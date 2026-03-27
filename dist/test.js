@@ -3,12 +3,7 @@
  * Tests endpoints, payloads, and stress tests rate limiting
  */
 import { KivestClient } from './kivest-client.js';
-const API_KEY = process.env.KIVEST_API_KEY;
-if (!API_KEY) {
-    console.error('Error: KIVEST_API_KEY environment variable is required');
-    console.error('Get your API key at: https://ai.ezif.in/api-key');
-    process.exit(1);
-}
+const API_KEY = process.env.KIVEST_API_KEY || '';
 class TestRunner {
     results = [];
     client;
@@ -33,7 +28,7 @@ class TestRunner {
                 name,
                 passed: false,
                 duration,
-                error: error instanceof Error ? error.message : String(error),
+                error: error instanceof Error ? error.message : String(error) || 'Unknown error',
             });
             console.log(`✗ ${name} (${duration}ms) - ${error}`);
         }
@@ -99,6 +94,7 @@ class TestRunner {
             const results = await this.client.batchSearch(requests);
             const duration = Date.now() - start;
             const successCount = results.filter(r => r.id !== 'error').length;
+            const stats = await this.client.getStats();
             return {
                 totalRequests: requests.length,
                 successful: successCount,
@@ -117,7 +113,7 @@ class TestRunner {
             }));
             const results = await this.client.batchSearch(requests);
             const duration = Date.now() - start;
-            const stats = this.client.getStats();
+            const stats = await this.client.getStats();
             return {
                 totalRequests: requests.length,
                 successful: results.filter(r => r.id !== 'error').length,
@@ -145,7 +141,7 @@ class TestRunner {
             }
             const results = await Promise.all(promises);
             const duration = Date.now() - start;
-            const stats = this.client.getStats();
+            const stats = await this.client.getStats();
             return {
                 totalRequests: 7,
                 completed: results.filter(r => r.id !== 'error').length,
@@ -157,7 +153,7 @@ class TestRunner {
     }
     async testStats() {
         await this.runTest('Stats Test - Get Rate Limiter Stats', async () => {
-            const stats = this.client.getStats();
+            const stats = await this.client.getStats();
             return {
                 queued: stats.queued,
                 running: stats.running,
