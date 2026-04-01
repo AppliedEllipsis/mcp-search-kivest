@@ -12,7 +12,7 @@ An MCP (Model Context Protocol) server that provides free AI-powered search capa
 - ⚡ **MCP Compatible**: Works with Claude Desktop, Cursor, and other MCP clients
 
 ## Discord / Contact
-Please visit their discord server for all their amazing free and paid AI Offerings.
+Please visit Kivest's discord server for all their amazing free and paid AI Offerings.
 https://discord.gg/kivestai
 
 
