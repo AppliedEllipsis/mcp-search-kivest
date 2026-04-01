@@ -11,6 +11,11 @@ An MCP (Model Context Protocol) server that provides free AI-powered search capa
 - 🛡️ **Robust Error Handling**: Automatic retries with exponential backoff
 - ⚡ **MCP Compatible**: Works with Claude Desktop, Cursor, and other MCP clients
 
+## Discord / Contact
+Please visit their discord server for all their amazing free and paid AI Offerings.
+https://discord.gg/kivestai
+
+
 ## Installation
 
 ### Via npx (Not Recommended)
