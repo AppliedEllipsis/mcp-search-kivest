@@ -74,7 +74,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
   "mcpServers": {
     "kivest-search": {
       "command": "npx",
-      "args": ["@kivest/mcp-search"]
+      "args": ["@USE_FILE_INSTALL_PATH_FOR_NOW/mcp-search"]
     }
   }
 }
@@ -86,7 +86,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
   "mcpServers": {
     "kivest-search": {
       "command": "npx",
-      "args": ["@kivest/mcp-search"],
+      "args": ["@USE_FILE_INSTALL_PATH_FOR_NOW/mcp-search"],
       "env": {
         "KIVEST_API_KEY": "your-api-key-here"
       }
@@ -109,7 +109,7 @@ Add to Cursor MCP settings:
   "mcpServers": {
     "kivest-search": {
       "command": "npx",
-      "args": ["-y", "@kivest/mcp-search"]
+      "args": ["-y", "@USE_FILE_INSTALL_PATH_FOR_NOW/mcp-search"]
     }
   }
 }
@@ -121,7 +121,7 @@ Add to Cursor MCP settings:
   "mcpServers": {
     "kivest-search": {
       "command": "npx",
-      "args": ["-y", "@kivest/mcp-search"],
+      "args": ["-y", "@USE_FILE_INSTALL_PATH_FOR_NOW/mcp-search"],
       "env": {
         "KIVEST_API_KEY": "your-api-key-here"
       }
@@ -288,7 +288,7 @@ npm publish --access public
 
 ```bash
 # Test published package
-npx @kivest/mcp-search --help
+npx @USE_FILE_INSTALL_PATH_FOR_NOW/mcp-search --help
 ```
 
 ## Development
